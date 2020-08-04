@@ -4,7 +4,7 @@
 
 ### Background
 
-This is a TensorFlow-based convolutional neural network (CNN) that generates interpolated video frames from two sequential input frames. It uses a UNet-based CNN architecture for computing the flow of segmented objects between frames, yielding smooth results with fewer artifacts versus conventional "naïve" methods like bilinear interpolation.
+This is a TensorFlow-based convolutional neural network (CNN) that generates interpolated video frames from two sequential input frames. It uses a UNet-based CNN architecture for computing the optical flow (motion) of segmented objects between frames, yielding smooth results with fewer artifacts versus conventional "naïve" methods like bilinear interpolation.
 
 <img src="https://github.com/cprost/cnn-frame-interpolation/blob/master/images/interp_vector.png" width="550">
 
@@ -14,7 +14,7 @@ Segmentation in conjunction with flow computation can identify objects that beco
 
 ### Implementation
 
-The implemented model was trained by providing a sequential frame *triplet* for each training step: *Frames 1* and *3* were provided as input, with the intermediate *frame #2* serving as the training target. Each step produced a synthetic *frame t* to be compared against the target *frame #2*, by means of a composite loss function.
+The implemented model was trained by providing a sequential frame *triplet* for each training step: *Frames I<sub>1</sub>* and *I<sub>3</sub>* were provided as input, with the intermediate *frame I<sub>2</sub>* serving as the training target. Each step produced a synthetic *frame I<sub>int</sub>* to be compared against the ground-truth *frame I<sub>2</sub>*, by means of a composite loss function. During the training phase, the CNN will learn to accurately predict motion and mitigate artifacts such as blurring or occlusion, producing a synthetic frame with minimal difference from the ground-truth frame.
 
 ### Results
 
