@@ -1,6 +1,6 @@
 # Video smoothing CNN
 
-![Header comparison gif - tea](/results/tea_comparison.gif)
+![Header comparison gif - city](/results/city_comparison.gif)
 
 ### Background
 
@@ -18,6 +18,8 @@ The implemented model was trained by providing a sequential frame *triplet* for 
 
 ### Results
 
+*Note: the .gifs may demonstrate aliasing, depending on your screen size. View the full-size images for better quality.*
+
 ![Drone comparison](/results/drone_comparison.gif)
 
-![Cityscape comparison](/results/city_comparison.gif)
+![Tea pouring comparison](/results/tea_comparison.gif)
