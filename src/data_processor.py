@@ -1,61 +1,120 @@
-# This is a standalone file for creating datasets and lists of files
-# The dataset used is Vimeo90K available here: http://toflow.csail.mit.edu/
+'''
+This is a standalone file for creating datasets and lists of files
+Datasets available from:
+http://toflow.csail.mit.edu/
+http://www.cs.ubc.ca/labs/imager/tr/2017/DeepVideoDeblurring/
+'''
 
-import os
+import parameters
 
-IM_WIDTH = 448
-IM_HEIGHT = 256
+import pathlib
+import shutil
+import cv2
+import tensorflow as tf
 
-def create_img_list():
-    data_folder = "./testdata/"  # must be folder containing sub-folders of images, as per Vimeo90K
+def load(data_dir, training=True):
+    '''
+    TODO: add dataset sharding for systems where RAM < dataset total size
+    '''
 
-    filelist = []
+    dataset = tf.data.Dataset.list_files(str(data_dir / '*'))  # grab list of all triplet directories
+    dataset = dataset.map(lambda dir: load_triplet(dir))
 
-    for path, subdirs, files in os.walk(data_folder):
-        for name in files:
-            if name == "im1.png":
-                filelist.append(path)  # we just need the directory
-            #elif name == "im3.png":
-                #x_3.append(os.path.join(path, name))
-            #elif name == "im2.png":
-                #y.append(os.path.join(path, name))
+    if training:
+        dataset = dataset.shuffle(parameters.SHUFFLE_BUF)  # DO NOT SHUFFLE ON INFERENCE!!!
 
-    with open("file_list.txt", "w") as file:
-        for s in filelist:
-            file.write(str(s) + "\n")
+    dataset = dataset.batch(parameters.BATCH_SIZE, drop_remainder=True)
 
-def create_npy():
-    x_1 = []
-    y = []
-    x_3 = []
+    # sanity check
+    # for batch_num, batch in enumerate(dataset):
+    #     print('Batch:', batch_num)
+    #     f1, f2, f3 = batch
+    #     triplets = zip(f1, f2, f3)
 
-    sample_list = []
+    #     for i, triplet in enumerate(triplets):
+    #         print(i)
+    #         print(triplet[0].shape)
+        
+    print("Dataset loaded!", str(data_dir))
 
-    for path, subdirs, files in os.walk("testdata"):
-        for name in files:
-            #print(os.path.join(path, name))
-            if name == "im1.png":
-                x_1.append(os.path.join(path, name))
-                sample_list.append(path)
-            elif name == "im3.png":
-                x_3.append(os.path.join(path, name))
-            elif name == "im2.png":
-                y.append(os.path.join(path, name))
+    return dataset
 
-    # should all be the same
-    print(len(x_1))
-    print(len(x_3))
-    print(len(y))
+def load_triplet(triplet_dir):
+    '''
+    TODO: add per-triplet data augmentation
+    '''
 
-    #convert from uint8 to 0-1 float before inputting to CNN
-    X_data = np.zeros(shape=(samples, IM_HEIGHT, IM_WIDTH, 6), dtype="uint8")
-    Y_data = np.zeros(shape=(samples, IM_HEIGHT, IM_WIDTH, 3), dtype="uint8")
-    data_out = np.zeros(shape=(samples, IM_HEIGHT, IM_WIDTH, 9), dtype="uint8")
+    frame_paths = tf.io.matching_files(triplet_dir + '/*.jpg')
+    frame_1 = load_frame(frame_paths[0])
+    frame_2 = load_frame(frame_paths[1])  # this is the target frame
+    frame_3 = load_frame(frame_paths[2])
 
-    for i in range(samples):
-        data_out[i, :, :, :3] = imageio.imread(x_1[i])
-        data_out[i, :, :, 3:6] = imageio.imread(x_3[i])
-        data_out[i, :, :, 6:] = imageio.imread(y[i])
+    return (frame_1, frame_2, frame_3)
 
-    data_out = data_out.astype("float32") / 255
-    np.save("./test_data/test_data.npy", data_out)
+def load_frame(frame_dir):
+    frame = tf.io.read_file(frame_dir)
+    frame = tf.image.decode_jpeg(frame)
+    frame = tf.image.convert_image_dtype(frame, dtype=tf.float32) # no more 'frame / 255' to normalize
+
+    return frame
+
+def generate_frames(input_dir, output_dir, width=1280, height=720):
+    print('Generating frames...')
+
+    # extract frames from video into temp folders
+    folder = input_dir.glob('**/*')
+    total_videos = len(list(folder))
+    video_num = 1
+
+    for video_name in input_dir.glob('**/*'):
+        output_subdir = (output_dir / ('temp_' + video_name.name)).with_suffix('')
+        print('Processed file {}/{} to {}'.format(video_num, total_videos, output_subdir))
+        pathlib.Path(output_subdir).mkdir(parents=True, exist_ok=True)
+
+        video_cap = cv2.VideoCapture(str(video_name))
+        success, frame = video_cap.read()
+        frame_num = 0
+        while success:
+            frame = cv2.resize(frame, (width, height))
+            cv2.imwrite('{}/frame%04d.jpg'.format(output_subdir) % frame_num, frame)
+            success, frame = video_cap.read()  # read next frame
+            frame_num += 1
+
+        video_num += 1
+
+    temp_folders = list(output_dir.glob('*'))
+
+    # generate training triplets
+    triplet_count = 0
+
+    for temp_folder in temp_folders:
+        frames = temp_folder.glob('*')
+        frames = sorted(frames)
+        triplet = []
+
+        for frame in frames:
+            triplet.append(frame)
+
+            if len(triplet) == 3:
+
+                # create triplet folder
+                pathlib.Path('{}/{}'.format(output_dir, triplet_count)).mkdir(exist_ok=True)
+                # move triplet
+                for file in triplet:
+                    shutil.move(str(file), '{}/{}/{}'.format(output_dir, triplet_count, file.name))
+                triplet_count += 1
+                triplet.clear()
+
+    # remove temp folders and any incomplete triplets
+    for temp_folder in temp_folders:
+        files = temp_folder.glob('*')
+
+        for file in files:
+            file.unlink()
+
+        temp_folder.rmdir()
+
+if __name__ == '__main__':
+    input_data_dir = pathlib.Path('../data/train')
+    output_data_dir = pathlib.Path('../out')
+    generate_frames(input_data_dir, output_data_dir, width=parameters.IMG_WIDTH, height=parameters.IMG_HEIGHT)
