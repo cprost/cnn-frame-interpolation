@@ -90,7 +90,7 @@ def rgb_uint8(image):
     image = cv2.cvtColor(np.float32(image), cv2.COLOR_RGB2BGR)
     return image.astype(np.uint8)
 
-def predict(model_dir, input_data_dir, output_data_dir, fps, width=parameters.IMG_WIDTH, height=parameters.IMG_HEIGHT):
+def generate_video(model_dir, input_data_dir, output_data_dir, fps, width=parameters.IMG_WIDTH, height=parameters.IMG_HEIGHT):
     print('Predicting new frames for the interpolated output video...')
     model = Interpolator()
     ckpt_path = tf.train.latest_checkpoint(model_dir)
@@ -98,7 +98,7 @@ def predict(model_dir, input_data_dir, output_data_dir, fps, width=parameters.IM
     input_frames = load_data(input_data_dir)
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_video = cv2.VideoWriter(str(output_data_dir / 'skwarl3.mp4'), fourcc, fps*2, (parameters.IMG_WIDTH, parameters.IMG_HEIGHT))
+    out_video = cv2.VideoWriter(str(output_data_dir / 'skwarl3.mp4'), fourcc, fps*2, (width, height))
 
     for batch_num, batch in enumerate(input_frames):
         batch_frames, batch_paths = batch
@@ -118,4 +118,4 @@ if __name__ == '__main__':
     output_data_dir = pathlib.Path('../video')
 
     width, height, fps_in = generate_frames(input_data_dir, temp_data_dir)
-    predict(model_dir, input_data_dir, output_data_dir, fps_in, width, height)
+    generate_video(model_dir, input_data_dir, output_data_dir, fps_in, width, height)
