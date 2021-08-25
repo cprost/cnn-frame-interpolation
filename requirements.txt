@@ -1,4 +1,4 @@
 numpy==1.18.0
-tensorflow==2.1.0
+tensorflow==2.5.1
 tensorflow_addons==0.10.0
 opencv-python==4.3.0.36
